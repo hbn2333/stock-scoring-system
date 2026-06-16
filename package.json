@@ -1,0 +1,17 @@
+{
+  "name": "stock-scoring-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local stock data warehouse and scoring prototype powered by stock-sdk.",
+  "scripts": {
+    "test": "node --test",
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "stock-sdk": "file:../stock-sdk"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
