@@ -6,6 +6,7 @@
   "description": "Local stock data warehouse and scoring prototype powered by stock-sdk.",
   "scripts": {
     "test": "node --test",
+    "ingest:daily": "node src/cli/ingest-daily.js",
     "start": "node src/index.js"
   },
   "dependencies": {
