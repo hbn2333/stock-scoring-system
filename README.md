@@ -37,7 +37,7 @@ const repo = createSqliteRepository(db);
 安装依赖后可以运行：
 
 ```bash
-npm run ingest:daily -- --date=2026-06-16 --symbols=600519,000001
+npm run ingest:daily -- --date=2026-06-16 "--symbols=600519,000001"
 ```
 
 默认会抓全市场 A 股行情快照。日 K 为了避免第一次抓取量过大，需要通过 `--symbols` 明确指定代码列表。
