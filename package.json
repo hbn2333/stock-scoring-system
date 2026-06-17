@@ -7,6 +7,7 @@
   "scripts": {
     "test": "node --test",
     "ingest:daily": "node src/cli/ingest-daily.js",
+    "update:daily": "node src/cli/update-daily.js",
     "start": "node src/index.js"
   },
   "dependencies": {

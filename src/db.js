@@ -20,6 +20,13 @@ export function initializeDatabase(db) {
 
 export function createSqliteRepository(db) {
   return {
+    getLatestKlineDate(code) {
+      const row = db
+        .prepare('SELECT MAX(trade_date) AS latest FROM stock_kline_daily WHERE code = ?')
+        .get(code);
+      return row.latest ?? null;
+    },
+
     upsertQuoteSnapshots(rows) {
       const statement = db.prepare(`
         INSERT INTO stock_quotes_daily_snapshot (

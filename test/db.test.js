@@ -137,6 +137,47 @@ test('sqlite repository upserts quotes, klines, factors, scores, and candidates'
   }
 });
 
+test('sqlite repository reads latest stored daily kline date by code', () => {
+  const { db, cleanup } = createTempDatabase();
+  try {
+    initializeDatabase(db);
+    const repo = createSqliteRepository(db);
+
+    repo.upsertKlineDaily([
+      {
+        tradeDate: '2026-06-15',
+        code: '600519',
+        open: 1490,
+        high: 1520,
+        low: 1480,
+        close: 1510,
+        volume: 120,
+        amount: 240,
+        turnoverRate: 0.3,
+        changePercent: 1.8,
+      },
+      {
+        tradeDate: '2026-06-16',
+        code: '600519',
+        open: 1510,
+        high: 1530,
+        low: 1500,
+        close: 1520,
+        volume: 150,
+        amount: 260,
+        turnoverRate: 0.4,
+        changePercent: 0.7,
+      },
+    ]);
+
+    assert.equal(repo.getLatestKlineDate('600519'), '2026-06-16');
+    assert.equal(repo.getLatestKlineDate('000001'), null);
+  } finally {
+    db.close();
+    cleanup();
+  }
+});
+
 function createTempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), 'stock-scoring-'));
   const db = openDatabase(join(dir, 'test.sqlite'));
