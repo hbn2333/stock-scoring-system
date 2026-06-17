@@ -20,6 +20,77 @@ export function initializeDatabase(db) {
 
 export function createSqliteRepository(db) {
   return {
+    upsertStockUniverse(rows) {
+      const statement = db.prepare(`
+        INSERT INTO stock_universe (code, name, market, enabled, notes, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(code) DO UPDATE SET
+          name = excluded.name,
+          market = excluded.market,
+          enabled = excluded.enabled,
+          notes = excluded.notes,
+          updated_at = excluded.updated_at
+      `);
+
+      runMany(db, rows, (row) =>
+        statement.run(
+          row.code,
+          row.name,
+          row.market ?? null,
+          row.enabled === false ? 0 : 1,
+          row.notes ?? null,
+          row.updatedAt ?? new Date().toISOString()
+        )
+      );
+    },
+
+    listEnabledUniverseSymbols({ limit } = {}) {
+      const sql = [
+        'SELECT code FROM stock_universe WHERE enabled = 1 ORDER BY code',
+        limit ? 'LIMIT ?' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      const statement = db.prepare(sql);
+      const rows = limit ? statement.all(limit) : statement.all();
+      return rows.map((row) => row.code);
+    },
+
+    seedStockUniverseFromLatestQuoteSnapshot() {
+      const latest = db
+        .prepare('SELECT MAX(trade_date) AS tradeDate FROM stock_quotes_daily_snapshot')
+        .get().tradeDate;
+      if (!latest) return { tradeDate: null, rowCount: 0 };
+
+      const result = db
+        .prepare(
+          `
+          INSERT INTO stock_universe (code, name, market, enabled, notes, updated_at)
+          SELECT
+            code,
+            name,
+            CASE
+              WHEN substr(code, 1, 1) = '6' THEN 'SH'
+              WHEN substr(code, 1, 1) IN ('0', '3') THEN 'SZ'
+              WHEN substr(code, 1, 1) IN ('4', '8') THEN 'BJ'
+              ELSE NULL
+            END AS market,
+            1 AS enabled,
+            NULL AS notes,
+            ? AS updated_at
+          FROM stock_quotes_daily_snapshot
+          WHERE trade_date = ?
+          ON CONFLICT(code) DO UPDATE SET
+            name = excluded.name,
+            market = excluded.market,
+            updated_at = excluded.updated_at
+        `
+        )
+        .run(new Date().toISOString(), latest);
+
+      return { tradeDate: latest, rowCount: result.changes };
+    },
+
     getLatestKlineDate(code) {
       const row = db
         .prepare('SELECT MAX(trade_date) AS latest FROM stock_kline_daily WHERE code = ?')

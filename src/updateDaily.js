@@ -12,6 +12,7 @@ export async function updateDailyData({
   initialStart = DEFAULT_INITIAL_START,
   quoteOptions = DEFAULT_QUOTE_OPTIONS,
   klineOptions = DEFAULT_KLINE_OPTIONS,
+  includeQuotes = true,
 } = {}) {
   if (!sdk) throw new Error('sdk is required');
   if (!repo) throw new Error('repo is required');
@@ -19,13 +20,15 @@ export async function updateDailyData({
   const jobs = [];
   const failures = [];
 
-  try {
-    const result = await ingestQuoteSnapshots({ sdk, repo, tradeDate, options: quoteOptions });
-    jobs.push({ type: 'quotes', status: 'success', rowCount: result.rowCount });
-  } catch (error) {
-    const failure = createFailure({ type: 'quotes', error });
-    failures.push(failure);
-    jobs.push({ type: 'quotes', status: 'failed', rowCount: 0, error: failure.message });
+  if (includeQuotes) {
+    try {
+      const result = await ingestQuoteSnapshots({ sdk, repo, tradeDate, options: quoteOptions });
+      jobs.push({ type: 'quotes', status: 'success', rowCount: result.rowCount });
+    } catch (error) {
+      const failure = createFailure({ type: 'quotes', error });
+      failures.push(failure);
+      jobs.push({ type: 'quotes', status: 'failed', rowCount: 0, error: failure.message });
+    }
   }
 
   for (const symbol of symbols) {
@@ -48,8 +51,8 @@ export async function updateDailyData({
     try {
       const klines = await sdk.kline.cn(symbol, {
         ...klineOptions,
-        start,
-        end,
+        startDate: start,
+        endDate: end,
       });
       const rows = klines.map(normalizeKlineRow);
       repo.upsertKlineDaily(rows);

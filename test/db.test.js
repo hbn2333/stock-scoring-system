@@ -29,6 +29,7 @@ test('initializeDatabase creates all warehouse tables', () => {
       'stock_kline_daily',
       'stock_quotes_daily_snapshot',
       'stock_scores',
+      'stock_universe',
     ]);
   } finally {
     db.close();
@@ -131,6 +132,109 @@ test('sqlite repository upserts quotes, klines, factors, scores, and candidates'
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM factor_values').get().count, 1);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM stock_scores').get().count, 1);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM daily_candidates').get().count, 1);
+  } finally {
+    db.close();
+    cleanup();
+  }
+});
+
+test('sqlite repository upserts and lists enabled stock universe symbols', () => {
+  const { db, cleanup } = createTempDatabase();
+  try {
+    initializeDatabase(db);
+    const repo = createSqliteRepository(db);
+
+    repo.upsertStockUniverse([
+      {
+        code: '600519',
+        name: 'Kweichow Moutai',
+        market: 'SH',
+        enabled: true,
+        notes: 'core holding',
+      },
+      {
+        code: '000001',
+        name: 'Ping An Bank',
+        market: 'SZ',
+        enabled: false,
+        notes: null,
+      },
+      {
+        code: '600519',
+        name: 'Kweichow Moutai Updated',
+        market: 'SH',
+        enabled: true,
+        notes: 'updated',
+      },
+    ]);
+
+    assert.deepEqual(repo.listEnabledUniverseSymbols(), ['600519']);
+    assert.deepEqual(repo.listEnabledUniverseSymbols({ limit: 1 }), ['600519']);
+
+    const row = db.prepare('SELECT name, enabled, notes FROM stock_universe WHERE code = ?').get(
+      '600519'
+    );
+    assert.equal(row.name, 'Kweichow Moutai Updated');
+    assert.equal(row.enabled, 1);
+    assert.equal(row.notes, 'updated');
+  } finally {
+    db.close();
+    cleanup();
+  }
+});
+
+test('sqlite repository seeds stock universe from latest quote snapshot', () => {
+  const { db, cleanup } = createTempDatabase();
+  try {
+    initializeDatabase(db);
+    const repo = createSqliteRepository(db);
+
+    repo.upsertQuoteSnapshots([
+      {
+        tradeDate: '2026-06-16',
+        code: '000001',
+        name: 'Ping An Bank Old',
+        price: 10,
+        changePercent: 1,
+        volume: 100,
+        amount: 1000,
+        turnoverRate: null,
+        pe: null,
+        pb: null,
+        totalMarketCap: null,
+      },
+      {
+        tradeDate: '2026-06-17',
+        code: '000001',
+        name: 'Ping An Bank',
+        price: 10,
+        changePercent: 1,
+        volume: 100,
+        amount: 1000,
+        turnoverRate: null,
+        pe: null,
+        pb: null,
+        totalMarketCap: null,
+      },
+      {
+        tradeDate: '2026-06-17',
+        code: '600519',
+        name: 'Kweichow Moutai',
+        price: 1500,
+        changePercent: 1,
+        volume: 100,
+        amount: 1000,
+        turnoverRate: null,
+        pe: null,
+        pb: null,
+        totalMarketCap: null,
+      },
+    ]);
+
+    const result = repo.seedStockUniverseFromLatestQuoteSnapshot();
+
+    assert.deepEqual(result, { tradeDate: '2026-06-17', rowCount: 2 });
+    assert.deepEqual(repo.listEnabledUniverseSymbols(), ['000001', '600519']);
   } finally {
     db.close();
     cleanup();

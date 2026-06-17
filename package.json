@@ -8,6 +8,8 @@
     "test": "node --test",
     "ingest:daily": "node src/cli/ingest-daily.js",
     "update:daily": "node src/cli/update-daily.js",
+    "universe:seed": "node src/cli/seed-universe.js",
+    "backfill:universe": "node src/cli/backfill-universe.js",
     "start": "node src/index.js"
   },
   "dependencies": {

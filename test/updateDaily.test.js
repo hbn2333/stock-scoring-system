@@ -58,8 +58,8 @@ test('updateDailyData fetches quotes and only missing daily klines', async () =>
       options: {
         period: 'daily',
         adjust: 'qfq',
-        start: '20260617',
-        end: '20260617',
+        startDate: '20260617',
+        endDate: '20260617',
       },
     },
   ]);
@@ -166,6 +166,38 @@ test('updateDailyData records quote failure and still updates klines', async () 
   assert.equal(repo.klineDaily.length, 1);
   assert.equal(report.failures[0].type, 'quotes');
   assert.equal(report.failures[0].message, 'quote source unavailable');
+});
+
+test('updateDailyData can skip quote snapshot fetch for kline-only backfills', async () => {
+  const sdk = {
+    batch: {
+      cn: async () => {
+        throw new Error('quote fetch should not run');
+      },
+    },
+    kline: {
+      cn: async (symbol) => [
+        {
+          date: '2026-06-17',
+          code: symbol,
+          close: 11,
+        },
+      ],
+    },
+  };
+  const repo = createMemoryRepo();
+
+  const report = await updateDailyData({
+    sdk,
+    repo,
+    tradeDate: '2026-06-17',
+    symbols: ['600519'],
+    includeQuotes: false,
+  });
+
+  assert.equal(report.status, 'success');
+  assert.equal(report.jobs.some((job) => job.type === 'quotes'), false);
+  assert.equal(repo.klineDaily.length, 1);
 });
 
 function createMemoryRepo({ latestByCode = {} } = {}) {

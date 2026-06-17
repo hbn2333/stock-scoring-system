@@ -59,6 +59,28 @@ npm run update:daily -- --date=2026-06-17 "--symbols=600519,000001"
 
 未来做 HTML 前端时，后端接口应该直接调用 `src/updateDaily.js` 里的 `updateDailyData()`，不要从 Web 按钮里 shell out 到 CLI。CLI 只是本地手动执行入口。
 
+## 建立股票池并批量回补
+
+第一次建库建议按这个顺序执行：
+
+```bash
+npm run update:daily -- --date=2026-06-17
+npm run universe:seed
+npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-size=50
+```
+
+含义：
+
+- `update:daily` 先抓一次全市场行情快照。
+- `universe:seed` 从最新行情快照把股票代码、名称、市场写入 `stock_universe`。
+- `backfill:universe` 读取启用股票池，分批补日 K。默认只补 K 线，不重复抓全市场快照。
+
+测试小批量时可以加 `--limit=100`：
+
+```bash
+npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-size=20 --limit=100
+```
+
 ## 下一步
 
 1. 增加资金流、北向、板块强度因子。
