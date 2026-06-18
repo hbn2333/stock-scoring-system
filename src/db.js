@@ -20,6 +20,70 @@ export function initializeDatabase(db) {
 
 export function createSqliteRepository(db) {
   return {
+    recordIngestFailure({ jobType, symbol, tradeDate, errorMessage, maxAttempts = 5 }) {
+      const now = new Date().toISOString();
+      db.prepare(
+        `
+        INSERT INTO ingest_failures (
+          job_type, symbol, trade_date, attempt_count, last_error, status,
+          created_at, updated_at, resolved_at
+        )
+        VALUES (?, ?, ?, 1, ?, CASE WHEN ? <= 1 THEN 'gave_up' ELSE 'pending' END, ?, ?, NULL)
+        ON CONFLICT(job_type, symbol, trade_date) DO UPDATE SET
+          attempt_count = ingest_failures.attempt_count + 1,
+          last_error = excluded.last_error,
+          status = CASE
+            WHEN ingest_failures.attempt_count + 1 >= ? THEN 'gave_up'
+            ELSE 'pending'
+          END,
+          updated_at = excluded.updated_at,
+          resolved_at = NULL
+      `
+      ).run(jobType, symbol, tradeDate, errorMessage, maxAttempts, now, now, maxAttempts);
+    },
+
+    resolveIngestFailure({ jobType, symbol, tradeDate }) {
+      db.prepare(
+        `
+        UPDATE ingest_failures
+        SET status = 'resolved', updated_at = ?, resolved_at = ?
+        WHERE job_type = ? AND symbol = ? AND trade_date = ?
+      `
+      ).run(new Date().toISOString(), new Date().toISOString(), jobType, symbol, tradeDate);
+    },
+
+    listPendingIngestFailures({ jobType, tradeDate, limit } = {}) {
+      const filters = ["status = 'pending'"];
+      const values = [];
+      if (jobType) {
+        filters.push('job_type = ?');
+        values.push(jobType);
+      }
+      if (tradeDate) {
+        filters.push('trade_date = ?');
+        values.push(tradeDate);
+      }
+      const sql = [
+        `
+        SELECT
+          job_type AS jobType,
+          symbol,
+          trade_date AS tradeDate,
+          attempt_count AS attemptCount,
+          last_error AS lastError,
+          status
+        FROM ingest_failures
+        WHERE ${filters.join(' AND ')}
+        ORDER BY updated_at ASC, symbol ASC
+      `,
+        limit ? 'LIMIT ?' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      if (limit) values.push(limit);
+      return db.prepare(sql).all(...values).map((row) => ({ ...row }));
+    },
+
     upsertStockUniverse(rows) {
       const statement = db.prepare(`
         INSERT INTO stock_universe (code, name, market, enabled, notes, updated_at)

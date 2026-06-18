@@ -61,7 +61,15 @@ test('backfillUniverseData batches enabled universe symbols and updates kline-on
 
 test('backfillUniverseData reports partial success when one batch has failures', async () => {
   const repo = {
+    recordedFailures: [],
+    resolvedFailures: [],
     listEnabledUniverseSymbols: () => ['000001', '600519'],
+    recordIngestFailure(failure) {
+      this.recordedFailures.push(failure);
+    },
+    resolveIngestFailure(failure) {
+      this.resolvedFailures.push(failure);
+    },
   };
 
   const report = await backfillUniverseData({
@@ -89,6 +97,18 @@ test('backfillUniverseData reports partial success when one batch has failures',
   assert.equal(report.totalSymbols, 2);
   assert.equal(report.totalKlineRows, 5);
   assert.deepEqual(report.failures, [{ type: 'kline', symbol: '600519', message: 'timeout' }]);
+  assert.deepEqual(repo.recordedFailures, [
+    {
+      jobType: 'kline',
+      symbol: '600519',
+      tradeDate: '2026-06-17',
+      errorMessage: 'timeout',
+      maxAttempts: 5,
+    },
+  ]);
+  assert.deepEqual(repo.resolvedFailures, [
+    { jobType: 'kline', symbol: '000001', tradeDate: '2026-06-17' },
+  ]);
 });
 
 test('backfillUniverseData skips when no enabled symbols exist', async () => {

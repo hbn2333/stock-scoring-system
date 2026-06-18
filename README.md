@@ -74,12 +74,29 @@ npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-
 - `update:daily` 先抓一次全市场行情快照。
 - `universe:seed` 从最新行情快照把股票代码、名称、市场写入 `stock_universe`。
 - `backfill:universe` 读取启用股票池，分批补日 K。默认只补 K 线，不重复抓全市场快照。
+- 回补失败会写入 `ingest_failures`，后续可以单独重试。
 
 测试小批量时可以加 `--limit=100`：
 
 ```bash
 npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-size=20 --limit=100
 ```
+
+## 重试失败抓取
+
+如果回补报告里出现 `failures`，可以运行：
+
+```bash
+npm run retry:failures -- --date=2026-06-18 --max-attempts=5 --batch-size=10
+```
+
+逻辑：
+
+- 只读取 `ingest_failures` 中 `pending` 的 K 线失败记录。
+- 在一次命令执行里持续重试，直到成功、没有 pending，或累计达到 `--max-attempts`。
+- 成功后标记 `resolved`。
+- 达到上限仍失败后标记 `gave_up`，后续默认不再自动重试。
+- 输出报告里的 `failedAttempts` 是本次失败尝试次数，`remainingFailures` 是命令结束后仍处于 pending 的记录数。
 
 ## 下一步
 

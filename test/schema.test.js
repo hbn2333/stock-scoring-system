@@ -6,6 +6,7 @@ import { createSchemaSql, TABLES } from '../src/schema.js';
 test('schema defines the scoring system warehouse tables', () => {
   assert.deepEqual(TABLES, [
     'ingest_runs',
+    'ingest_failures',
     'stock_universe',
     'stock_quotes_daily_snapshot',
     'stock_kline_daily',
@@ -19,9 +20,11 @@ test('schema SQL is idempotent and includes scoring keys', () => {
   const sql = createSchemaSql().join('\n');
 
   assert.match(sql, /CREATE TABLE IF NOT EXISTS stock_scores/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS ingest_failures/);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS stock_universe/);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS factor_values/);
   assert.match(sql, /UNIQUE\(code\)/);
+  assert.match(sql, /UNIQUE\(job_type, symbol, trade_date\)/);
   assert.match(sql, /UNIQUE\(trade_date, code, factor_name\)/);
   assert.match(sql, /UNIQUE\(trade_date, strategy_name, code\)/);
 });

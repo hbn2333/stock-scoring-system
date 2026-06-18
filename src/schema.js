@@ -1,5 +1,6 @@
 export const TABLES = [
   'ingest_runs',
+  'ingest_failures',
   'stock_universe',
   'stock_quotes_daily_snapshot',
   'stock_kline_daily',
@@ -18,6 +19,18 @@ export function createSchemaSql() {
       status TEXT NOT NULL,
       row_count INTEGER NOT NULL DEFAULT 0,
       error_message TEXT
+    )`,
+    `CREATE TABLE IF NOT EXISTS ingest_failures (
+      job_type TEXT NOT NULL,
+      symbol TEXT NOT NULL,
+      trade_date TEXT NOT NULL,
+      attempt_count INTEGER NOT NULL DEFAULT 0,
+      last_error TEXT,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      resolved_at TEXT,
+      UNIQUE(job_type, symbol, trade_date)
     )`,
     `CREATE TABLE IF NOT EXISTS stock_universe (
       code TEXT NOT NULL,

@@ -11,6 +11,7 @@ export async function backfillUniverseData({
   limit,
   initialStart = DEFAULT_INITIAL_START,
   klineOptions,
+  maxAttempts = 5,
   updateDailyDataFn = updateDailyData,
 } = {}) {
   if (!sdk) throw new Error('sdk is required');
@@ -48,6 +49,7 @@ export async function backfillUniverseData({
     const rowCount = sumKlineRows(result.jobs);
     totalKlineRows += rowCount;
     failures.push(...(result.failures ?? []));
+    recordKlineFailureStates(repo, tradeDate, result, maxAttempts);
     batches.push({
       symbols: batchSymbols,
       status: result.status,
@@ -64,6 +66,34 @@ export async function backfillUniverseData({
     batches,
     failures,
   };
+}
+
+function recordKlineFailureStates(repo, tradeDate, result, maxAttempts) {
+  const failedSymbols = new Map(
+    (result.failures ?? [])
+      .filter((failure) => failure.type === 'kline' && failure.symbol)
+      .map((failure) => [failure.symbol, failure])
+  );
+
+  for (const job of result.jobs ?? []) {
+    if (job.type !== 'kline' || !job.symbol) continue;
+    const failure = failedSymbols.get(job.symbol);
+    if (failure) {
+      repo.recordIngestFailure?.({
+        jobType: 'kline',
+        symbol: job.symbol,
+        tradeDate,
+        errorMessage: failure.message,
+        maxAttempts,
+      });
+    } else if (job.status === 'success' || job.status === 'skipped') {
+      repo.resolveIngestFailure?.({
+        jobType: 'kline',
+        symbol: job.symbol,
+        tradeDate,
+      });
+    }
+  }
 }
 
 function chunk(items, size) {

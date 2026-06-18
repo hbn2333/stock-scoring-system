@@ -25,6 +25,7 @@ test('initializeDatabase creates all warehouse tables', () => {
     assert.deepEqual(tables, [
       'daily_candidates',
       'factor_values',
+      'ingest_failures',
       'ingest_runs',
       'stock_kline_daily',
       'stock_quotes_daily_snapshot',
@@ -132,6 +133,71 @@ test('sqlite repository upserts quotes, klines, factors, scores, and candidates'
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM factor_values').get().count, 1);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM stock_scores').get().count, 1);
     assert.equal(db.prepare('SELECT COUNT(*) AS count FROM daily_candidates').get().count, 1);
+  } finally {
+    db.close();
+    cleanup();
+  }
+});
+
+test('sqlite repository tracks ingest failures until max attempts are exhausted', () => {
+  const { db, cleanup } = createTempDatabase();
+  try {
+    initializeDatabase(db);
+    const repo = createSqliteRepository(db);
+
+    repo.recordIngestFailure({
+      jobType: 'kline',
+      symbol: '000419',
+      tradeDate: '2026-06-18',
+      errorMessage: 'fetch failed',
+      maxAttempts: 5,
+    });
+    repo.recordIngestFailure({
+      jobType: 'kline',
+      symbol: '000419',
+      tradeDate: '2026-06-18',
+      errorMessage: 'fetch failed again',
+      maxAttempts: 5,
+    });
+
+    assert.deepEqual(repo.listPendingIngestFailures({ jobType: 'kline', tradeDate: '2026-06-18' }), [
+      {
+        jobType: 'kline',
+        symbol: '000419',
+        tradeDate: '2026-06-18',
+        attemptCount: 2,
+        lastError: 'fetch failed again',
+        status: 'pending',
+      },
+    ]);
+
+    repo.resolveIngestFailure({
+      jobType: 'kline',
+      symbol: '000419',
+      tradeDate: '2026-06-18',
+    });
+
+    assert.deepEqual(repo.listPendingIngestFailures({ jobType: 'kline', tradeDate: '2026-06-18' }), []);
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      repo.recordIngestFailure({
+        jobType: 'kline',
+        symbol: '000420',
+        tradeDate: '2026-06-18',
+        errorMessage: `failed ${attempt + 1}`,
+        maxAttempts: 5,
+      });
+    }
+
+    assert.deepEqual(repo.listPendingIngestFailures({ jobType: 'kline', tradeDate: '2026-06-18' }), []);
+    const row = db
+      .prepare(
+        'SELECT attempt_count, last_error, status FROM ingest_failures WHERE job_type = ? AND symbol = ? AND trade_date = ?'
+      )
+      .get('kline', '000420', '2026-06-18');
+    assert.equal(row.attempt_count, 5);
+    assert.equal(row.last_error, 'failed 5');
+    assert.equal(row.status, 'gave_up');
   } finally {
     db.close();
     cleanup();
