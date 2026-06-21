@@ -12,6 +12,8 @@ export async function backfillUniverseData({
   initialStart = DEFAULT_INITIAL_START,
   klineOptions,
   maxAttempts = 5,
+  onProgress,
+  now = () => Date.now(),
   updateDailyDataFn = updateDailyData,
 } = {}) {
   if (!sdk) throw new Error('sdk is required');
@@ -35,8 +37,12 @@ export async function backfillUniverseData({
   const batches = [];
   const failures = [];
   let totalKlineRows = 0;
+  let completedSymbols = 0;
+  const symbolBatches = chunk(symbols, batchSize);
+  const totalBatches = symbolBatches.length;
+  const startedAt = now();
 
-  for (const batchSymbols of chunk(symbols, batchSize)) {
+  for (const [batchIndex, batchSymbols] of symbolBatches.entries()) {
     const result = await updateDailyDataFn({
       sdk,
       repo,
@@ -49,12 +55,28 @@ export async function backfillUniverseData({
     const rowCount = sumKlineRows(result.jobs);
     totalKlineRows += rowCount;
     failures.push(...(result.failures ?? []));
+    completedSymbols += batchSymbols.length;
     recordKlineFailureStates(repo, tradeDate, result, maxAttempts);
     batches.push({
       symbols: batchSymbols,
       status: result.status,
       rowCount,
       failures: result.failures ?? [],
+    });
+    const completedBatches = batchIndex + 1;
+    const elapsedMs = now() - startedAt;
+    onProgress?.({
+      type: 'backfill',
+      tradeDate,
+      batchIndex: completedBatches,
+      totalBatches,
+      completedSymbols,
+      totalSymbols: symbols.length,
+      totalKlineRows,
+      failureCount: failures.length,
+      elapsedMs,
+      estimatedRemainingMs: estimateRemainingMs(elapsedMs, completedBatches, totalBatches),
+      status: result.status,
     });
   }
 
@@ -66,6 +88,11 @@ export async function backfillUniverseData({
     batches,
     failures,
   };
+}
+
+function estimateRemainingMs(elapsedMs, completedUnits, totalUnits) {
+  if (completedUnits <= 0 || completedUnits >= totalUnits) return 0;
+  return Math.round((elapsedMs / completedUnits) * (totalUnits - completedUnits));
 }
 
 function recordKlineFailureStates(repo, tradeDate, result, maxAttempts) {

@@ -7,6 +7,7 @@ import {
   todayInShanghai,
 } from '../index.js';
 import { parseBackfillUniverseArgs } from './backfillUniverseArgs.js';
+import { formatBackfillProgress } from './progress.js';
 
 const args = parseBackfillUniverseArgs(process.argv.slice(2));
 const { StockSDK } = await import('stock-sdk');
@@ -24,6 +25,7 @@ try {
     limit: args.limit,
     initialStart: args.initialStart,
     klineOptions: args.klineOptions,
+    onProgress: (event) => console.error(formatBackfillProgress(event)),
   });
 
   console.log(JSON.stringify(report, null, 2));

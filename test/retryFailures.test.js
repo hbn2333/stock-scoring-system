@@ -5,6 +5,8 @@ import { retryIngestFailures } from '../src/retryFailures.js';
 
 test('retryIngestFailures retries pending kline failures and resolves successes', async () => {
   const calls = [];
+  const progressEvents = [];
+  const times = [1000, 2500];
   const repo = createRetryRepo([
     {
       jobType: 'kline',
@@ -30,6 +32,8 @@ test('retryIngestFailures retries pending kline failures and resolves successes'
     tradeDate: '2026-06-18',
     batchSize: 2,
     maxAttempts: 1,
+    now: () => times.shift(),
+    onProgress: (event) => progressEvents.push(event),
     updateDailyDataFn: async (options) => {
       calls.push(options);
       return {
@@ -63,6 +67,34 @@ test('retryIngestFailures retries pending kline failures and resolves successes'
       maxAttempts: 1,
     },
   ]);
+  assert.deepEqual(
+    progressEvents.map((event) => ({
+      type: event.type,
+      passIndex: event.passIndex,
+      completedBatches: event.completedBatches,
+      completedAttempts: event.completedAttempts,
+      totalAttemptBudget: event.totalAttemptBudget,
+      resolvedSymbols: event.resolvedSymbols,
+      failedAttempts: event.failedAttempts,
+      remainingFailures: event.remainingFailures,
+      elapsedMs: event.elapsedMs,
+      estimatedRemainingMs: event.estimatedRemainingMs,
+    })),
+    [
+      {
+        type: 'retry',
+        passIndex: 1,
+        completedBatches: 1,
+        completedAttempts: 2,
+        totalAttemptBudget: 2,
+        resolvedSymbols: 1,
+        failedAttempts: 1,
+        remainingFailures: 0,
+        elapsedMs: 1500,
+        estimatedRemainingMs: 0,
+      },
+    ]
+  );
 });
 
 test('retryIngestFailures skips when no pending failures exist', async () => {

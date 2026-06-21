@@ -5,6 +5,8 @@ import { backfillUniverseData } from '../src/backfill.js';
 
 test('backfillUniverseData batches enabled universe symbols and updates kline-only data', async () => {
   const calls = [];
+  const progressEvents = [];
+  const times = [1000, 2000, 4000];
   const repo = {
     listEnabledUniverseSymbols: ({ limit } = {}) =>
       ['000001', '600519', '300750'].slice(0, limit ?? 3),
@@ -17,6 +19,8 @@ test('backfillUniverseData batches enabled universe symbols and updates kline-on
     batchSize: 2,
     limit: 3,
     initialStart: '20240101',
+    now: () => times.shift(),
+    onProgress: (event) => progressEvents.push(event),
     updateDailyDataFn: async (options) => {
       calls.push(options);
       return {
@@ -54,6 +58,43 @@ test('backfillUniverseData batches enabled universe symbols and updates kline-on
         tradeDate: '2026-06-17',
         initialStart: '20240101',
         includeQuotes: false,
+      },
+    ]
+  );
+  assert.deepEqual(
+    progressEvents.map((event) => ({
+      type: event.type,
+      batchIndex: event.batchIndex,
+      totalBatches: event.totalBatches,
+      completedSymbols: event.completedSymbols,
+      totalSymbols: event.totalSymbols,
+      totalKlineRows: event.totalKlineRows,
+      failureCount: event.failureCount,
+      elapsedMs: event.elapsedMs,
+      estimatedRemainingMs: event.estimatedRemainingMs,
+    })),
+    [
+      {
+        type: 'backfill',
+        batchIndex: 1,
+        totalBatches: 2,
+        completedSymbols: 2,
+        totalSymbols: 3,
+        totalKlineRows: 20,
+        failureCount: 0,
+        elapsedMs: 1000,
+        estimatedRemainingMs: 1000,
+      },
+      {
+        type: 'backfill',
+        batchIndex: 2,
+        totalBatches: 2,
+        completedSymbols: 3,
+        totalSymbols: 3,
+        totalKlineRows: 30,
+        failureCount: 0,
+        elapsedMs: 3000,
+        estimatedRemainingMs: 0,
       },
     ]
   );

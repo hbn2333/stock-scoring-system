@@ -6,6 +6,7 @@ import {
   retryIngestFailures,
   todayInShanghai,
 } from '../index.js';
+import { formatRetryProgress } from './progress.js';
 import { parseRetryFailuresArgs } from './retryFailuresArgs.js';
 
 const args = parseRetryFailuresArgs(process.argv.slice(2));
@@ -25,6 +26,7 @@ try {
     maxAttempts: args.maxAttempts,
     initialStart: args.initialStart,
     klineOptions: args.klineOptions,
+    onProgress: (event) => console.error(formatRetryProgress(event)),
   });
 
   console.log(JSON.stringify(report, null, 2));

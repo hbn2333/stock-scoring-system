@@ -82,6 +82,14 @@ npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-
 npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-size=20 --limit=100
 ```
 
+回补过程中会输出进度和预计剩余时间，例如：
+
+```text
+[backfill 12/277] 240/5527 symbols | rows 18320 | failures 3 | elapsed 00:08:42 | ETA 03:05:18
+```
+
+进度行输出到 stderr，最终 JSON 报告输出到 stdout。需要保存最终报告时可以重定向 stdout。
+
 ## 重试失败抓取
 
 如果回补报告里出现 `failures`，可以运行：
@@ -97,6 +105,11 @@ npm run retry:failures -- --date=2026-06-18 --max-attempts=5 --batch-size=10
 - 成功后标记 `resolved`。
 - 达到上限仍失败后标记 `gave_up`，后续默认不再自动重试。
 - 输出报告里的 `failedAttempts` 是本次失败尝试次数，`remainingFailures` 是命令结束后仍处于 pending 的记录数。
+- 重试过程也会输出进度行，例如：
+
+```text
+[retry pass 2 batch 4] attempts 40/100 | resolved 8 | failed attempts 32 | pending 12 | elapsed 00:01:30 | ETA 00:02:15
+```
 
 ## 下一步
 

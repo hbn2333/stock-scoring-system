@@ -12,6 +12,8 @@ export async function retryIngestFailures({
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
   initialStart = '20240101',
   klineOptions,
+  onProgress,
+  now = () => Date.now(),
   updateDailyDataFn = updateDailyData,
 } = {}) {
   if (!sdk) throw new Error('sdk is required');
@@ -43,6 +45,10 @@ export async function retryIngestFailures({
   let resolvedSymbols = 0;
   let retriedSymbols = 0;
   let passCount = 0;
+  let failedAttempts = 0;
+  let completedBatches = 0;
+  const totalAttemptBudget = initialFailures.length * maxAttempts;
+  const startedAt = now();
 
   while (passCount < maxAttempts) {
     const pendingFailures = repo.listPendingIngestFailures({ jobType: 'kline', tradeDate, limit });
@@ -80,16 +86,38 @@ export async function retryIngestFailures({
           };
           repo.recordIngestFailure(recorded);
           retryFailures.push(failure);
+          failedAttempts += 1;
         } else if (job.status === 'success' || job.status === 'skipped') {
           repo.resolveIngestFailure({ jobType: 'kline', symbol: job.symbol, tradeDate });
           resolvedSymbols += 1;
         }
       }
 
+      completedBatches += 1;
+      const elapsedMs = now() - startedAt;
+      const remainingFailures = repo.listPendingIngestFailures({
+        jobType: 'kline',
+        tradeDate,
+        limit,
+      }).length;
       batches.push({
         symbols,
         status: result.status,
         failures: result.failures ?? [],
+      });
+      onProgress?.({
+        type: 'retry',
+        tradeDate,
+        passIndex: passCount,
+        completedBatches,
+        completedAttempts: retriedSymbols,
+        totalAttemptBudget,
+        resolvedSymbols,
+        failedAttempts,
+        remainingFailures,
+        elapsedMs,
+        estimatedRemainingMs: estimateRemainingMs(elapsedMs, retriedSymbols, totalAttemptBudget),
+        status: result.status,
       });
     }
   }
@@ -100,11 +128,16 @@ export async function retryIngestFailures({
     totalFailures: initialFailures.length,
     retriedSymbols,
     resolvedSymbols,
-    failedAttempts: retryFailures.length,
+    failedAttempts,
     remainingFailures: repo.listPendingIngestFailures({ jobType: 'kline', tradeDate, limit }).length,
     batches,
     failures: retryFailures,
   };
+}
+
+function estimateRemainingMs(elapsedMs, completedUnits, totalUnits) {
+  if (completedUnits <= 0 || completedUnits >= totalUnits) return 0;
+  return Math.round((elapsedMs / completedUnits) * (totalUnits - completedUnits));
 }
 
 function chunk(items, size) {
