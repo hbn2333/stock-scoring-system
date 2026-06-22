@@ -156,6 +156,58 @@ test('backfillUniverseData reports partial success when one batch has failures',
   ]);
 });
 
+test('backfillUniverseData aborts early when consecutive batches look like provider outage', async () => {
+  const calls = [];
+  const progressEvents = [];
+  const symbols = ['000001', '000002', '000003', '000004', '000005', '000006'];
+  const repo = {
+    recordedFailures: [],
+    listEnabledUniverseSymbols: () => symbols,
+    recordIngestFailure(failure) {
+      this.recordedFailures.push(failure);
+    },
+  };
+
+  const report = await backfillUniverseData({
+    sdk: {},
+    repo,
+    tradeDate: '2026-06-19',
+    batchSize: 2,
+    onProgress: (event) => progressEvents.push(event),
+    updateDailyDataFn: async ({ symbols: batchSymbols }) => {
+      calls.push(batchSymbols);
+      return {
+        status: 'failed',
+        jobs: batchSymbols.map((symbol) => ({
+          type: 'kline',
+          symbol,
+          status: 'failed',
+          rowCount: 0,
+        })),
+        failures: batchSymbols.map((symbol) => ({
+          type: 'kline',
+          symbol,
+          message: 'fetch failed',
+        })),
+      };
+    },
+  });
+
+  assert.equal(report.status, 'failed');
+  assert.equal(report.aborted, true);
+  assert.equal(report.abortReason, 'kline_provider_unavailable');
+  assert.equal(report.totalSymbols, 6);
+  assert.deepEqual(calls, [
+    ['000001', '000002'],
+    ['000003', '000004'],
+  ]);
+  assert.equal(report.batches.length, 2);
+  assert.equal(report.failures.length, 4);
+  assert.equal(repo.recordedFailures.length, 4);
+  assert.equal(progressEvents.at(-1).aborted, true);
+  assert.equal(progressEvents.at(-1).abortReason, 'kline_provider_unavailable');
+});
+
 test('backfillUniverseData skips when no enabled symbols exist', async () => {
   const report = await backfillUniverseData({
     sdk: {},

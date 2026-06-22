@@ -25,6 +25,8 @@ try {
     limit: args.limit,
     initialStart: args.initialStart,
     klineOptions: args.klineOptions,
+    maxConsecutiveFailedBatches: args.maxConsecutiveFailedBatches,
+    failureRateAbortThreshold: args.failureRateAbortThreshold,
     onProgress: (event) => console.error(formatBackfillProgress(event)),
   });
 

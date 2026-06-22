@@ -29,6 +29,24 @@ test('formatBackfillProgress renders stable progress text', () => {
   );
 });
 
+test('formatBackfillProgress marks an aborted backfill', () => {
+  assert.equal(
+    formatBackfillProgress({
+      batchIndex: 2,
+      totalBatches: 277,
+      completedSymbols: 40,
+      totalSymbols: 5527,
+      totalKlineRows: 0,
+      failureCount: 40,
+      elapsedMs: 240000,
+      estimatedRemainingMs: 0,
+      aborted: true,
+      abortReason: 'kline_provider_unavailable',
+    }),
+    '[backfill 2/277] 40/5527 symbols | rows 0 | failures 40 | elapsed 00:04:00 | ETA 00:00:00 | ABORT kline_provider_unavailable'
+  );
+});
+
 test('formatRetryProgress renders stable retry progress text', () => {
   assert.equal(
     formatRetryProgress({

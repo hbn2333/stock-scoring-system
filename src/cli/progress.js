@@ -7,13 +7,17 @@ export function formatDuration(milliseconds) {
 }
 
 export function formatBackfillProgress(event) {
-  return [
+  const parts = [
     `[backfill ${event.batchIndex}/${event.totalBatches}] ${event.completedSymbols}/${event.totalSymbols} symbols`,
     `rows ${event.totalKlineRows}`,
     `failures ${event.failureCount}`,
     `elapsed ${formatDuration(event.elapsedMs)}`,
     `ETA ${formatDuration(event.estimatedRemainingMs)}`,
-  ].join(' | ');
+  ];
+  if (event.aborted) {
+    parts.push(`ABORT ${event.abortReason}`);
+  }
+  return parts.join(' | ');
 }
 
 export function formatRetryProgress(event) {
