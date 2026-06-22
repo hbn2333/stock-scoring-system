@@ -6,7 +6,7 @@ import { parseBackfillUniverseArgs } from '../src/cli/backfillUniverseArgs.js';
 test('parseBackfillUniverseArgs maps command arguments to backfill options', () => {
   assert.deepEqual(
     parseBackfillUniverseArgs([
-      '--date=2026-06-17',
+      '--end-date=2026-06-17',
       '--db=data/custom.sqlite',
       '--batch-size=25',
       '--limit=100',
@@ -33,6 +33,14 @@ test('parseBackfillUniverseArgs uses safe defaults', () => {
     initialStart: '20240101',
     klineOptions: { period: 'daily', adjust: 'qfq' },
   });
+});
+
+test('parseBackfillUniverseArgs keeps --date as a backward-compatible end date alias', () => {
+  assert.equal(parseBackfillUniverseArgs(['--date=2026-06-18']).tradeDate, '2026-06-18');
+  assert.equal(
+    parseBackfillUniverseArgs(['--date=2026-06-18', '--end-date=2026-06-19']).tradeDate,
+    '2026-06-19'
+  );
 });
 
 test('parseBackfillUniverseArgs rejects invalid numeric arguments', () => {

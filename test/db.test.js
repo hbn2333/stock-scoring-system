@@ -249,6 +249,71 @@ test('sqlite repository upserts and lists enabled stock universe symbols', () =>
   }
 });
 
+test('sqlite repository lists only enabled symbols needing kline backfill before end date', () => {
+  const { db, cleanup } = createTempDatabase();
+  try {
+    initializeDatabase(db);
+    const repo = createSqliteRepository(db);
+
+    repo.upsertStockUniverse([
+      { code: '000001', name: 'Ping An Bank', market: 'SZ', enabled: true },
+      { code: '000002', name: 'Vanke A', market: 'SZ', enabled: true },
+      { code: '000004', name: 'Guohua Network', market: 'SZ', enabled: true },
+      { code: '600519', name: 'Kweichow Moutai', market: 'SH', enabled: false },
+    ]);
+    repo.upsertKlineDaily([
+      {
+        tradeDate: '2026-06-22',
+        code: '000001',
+        open: 10,
+        high: 11,
+        low: 9,
+        close: 10,
+        volume: 100,
+        amount: 1000,
+        turnoverRate: null,
+        changePercent: null,
+      },
+      {
+        tradeDate: '2026-06-21',
+        code: '000002',
+        open: 10,
+        high: 11,
+        low: 9,
+        close: 10,
+        volume: 100,
+        amount: 1000,
+        turnoverRate: null,
+        changePercent: null,
+      },
+      {
+        tradeDate: '2026-06-20',
+        code: '600519',
+        open: 1500,
+        high: 1510,
+        low: 1490,
+        close: 1500,
+        volume: 100,
+        amount: 1000,
+        turnoverRate: null,
+        changePercent: null,
+      },
+    ]);
+
+    assert.deepEqual(repo.listUniverseSymbolsNeedingKlineBackfill({ endDate: '2026-06-22' }), [
+      '000002',
+      '000004',
+    ]);
+    assert.deepEqual(
+      repo.listUniverseSymbolsNeedingKlineBackfill({ endDate: '2026-06-22', limit: 1 }),
+      ['000002']
+    );
+  } finally {
+    db.close();
+    cleanup();
+  }
+});
+
 test('sqlite repository seeds stock universe from latest quote snapshot', () => {
   const { db, cleanup } = createTempDatabase();
   try {

@@ -22,7 +22,9 @@ export async function backfillUniverseData({
     throw new Error('batchSize must be a positive integer');
   }
 
-  const symbols = repo.listEnabledUniverseSymbols({ limit });
+  const symbols = repo.listUniverseSymbolsNeedingKlineBackfill
+    ? repo.listUniverseSymbolsNeedingKlineBackfill({ endDate: tradeDate, limit })
+    : repo.listEnabledUniverseSymbols({ limit });
   if (symbols.length === 0) {
     return {
       tradeDate,

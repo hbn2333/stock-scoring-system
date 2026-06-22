@@ -6,7 +6,7 @@ import { parseRetryFailuresArgs } from '../src/cli/retryFailuresArgs.js';
 test('parseRetryFailuresArgs maps command arguments to retry options', () => {
   assert.deepEqual(
     parseRetryFailuresArgs([
-      '--date=2026-06-18',
+      '--end-date=2026-06-18',
       '--db=data/custom.sqlite',
       '--batch-size=8',
       '--limit=20',
@@ -36,6 +36,14 @@ test('parseRetryFailuresArgs uses retry defaults', () => {
     initialStart: '20240101',
     klineOptions: { period: 'daily', adjust: 'qfq' },
   });
+});
+
+test('parseRetryFailuresArgs keeps --date as a backward-compatible end date alias', () => {
+  assert.equal(parseRetryFailuresArgs(['--date=2026-06-18']).tradeDate, '2026-06-18');
+  assert.equal(
+    parseRetryFailuresArgs(['--date=2026-06-18', '--end-date=2026-06-19']).tradeDate,
+    '2026-06-19'
+  );
 });
 
 test('parseRetryFailuresArgs rejects invalid numeric arguments', () => {

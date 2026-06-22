@@ -47,7 +47,7 @@ npm run ingest:daily -- --date=2026-06-16 "--symbols=600519,000001"
 推荐日常使用新的增量更新命令：
 
 ```bash
-npm run update:daily -- --date=2026-06-17 "--symbols=600519,000001"
+npm run update:daily -- --end-date=2026-06-17 "--symbols=600519,000001"
 ```
 
 这个命令会调用 `updateDailyData()`：
@@ -56,6 +56,7 @@ npm run update:daily -- --date=2026-06-17 "--symbols=600519,000001"
 - 对每个 `--symbols` 股票先查询数据库里已有的最新日 K 日期，只补缺失日期。
 - 单只股票抓取失败不会中断其他股票，命令会输出 JSON 报告，包含 `success`、`partial_success` 或 `failed` 状态。
 - 第一次更新某只股票时，默认从 `20200101` 开始抓取；可用 `--initial-start=20240101` 调小首次回补范围。
+- `--end-date` 是补数据的截止日期；旧参数 `--date` 仍兼容，但新命令建议统一写 `--end-date`。
 
 未来做 HTML 前端时，后端接口应该直接调用 `src/updateDaily.js` 里的 `updateDailyData()`，不要从 Web 按钮里 shell out 到 CLI。CLI 只是本地手动执行入口。
 
@@ -64,22 +65,23 @@ npm run update:daily -- --date=2026-06-17 "--symbols=600519,000001"
 第一次建库建议按这个顺序执行：
 
 ```bash
-npm run update:daily -- --date=2026-06-17
+npm run update:daily -- --end-date=2026-06-17
 npm run universe:seed
-npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-size=50
+npm run backfill:universe -- --end-date=2026-06-17 --initial-start=20240101 --batch-size=50
 ```
 
 含义：
 
 - `update:daily` 先抓一次全市场行情快照。
 - `universe:seed` 从最新行情快照把股票代码、名称、市场写入 `stock_universe`。
-- `backfill:universe` 读取启用股票池，分批补日 K。默认只补 K 线，不重复抓全市场快照。
+- `backfill:universe` 读取启用股票池，只筛选最新日 K 日期还没到 `--end-date` 的股票，分批补日 K。默认只补 K 线，不重复抓全市场快照。
 - 回补失败会写入 `ingest_failures`，后续可以单独重试。
+- `--end-date` 最好使用交易日；如果填周末或节假日，最后一根日 K 通常停在前一个交易日，脚本会认为还没补到该自然日。
 
 测试小批量时可以加 `--limit=100`：
 
 ```bash
-npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-size=20 --limit=100
+npm run backfill:universe -- --end-date=2026-06-17 --initial-start=20240101 --batch-size=20 --limit=100
 ```
 
 回补过程中会输出进度和预计剩余时间，例如：
@@ -95,12 +97,13 @@ npm run backfill:universe -- --date=2026-06-17 --initial-start=20240101 --batch-
 如果回补报告里出现 `failures`，可以运行：
 
 ```bash
-npm run retry:failures -- --date=2026-06-18 --max-attempts=5 --batch-size=10
+npm run retry:failures -- --end-date=2026-06-18 --max-attempts=5 --batch-size=10
 ```
 
 逻辑：
 
 - 只读取 `ingest_failures` 中 `pending` 的 K 线失败记录。
+- `--end-date` 会匹配失败记录里的截止日期；旧参数 `--date` 仍兼容。
 - 在一次命令执行里持续重试，直到成功、没有 pending，或累计达到 `--max-attempts`。
 - 成功后标记 `resolved`。
 - 达到上限仍失败后标记 `gave_up`，后续默认不再自动重试。

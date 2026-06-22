@@ -120,6 +120,32 @@ export function createSqliteRepository(db) {
       return rows.map((row) => row.code);
     },
 
+    listUniverseSymbolsNeedingKlineBackfill({ endDate, limit } = {}) {
+      if (!endDate) throw new Error('endDate is required');
+      const sql = [
+        `
+        SELECT u.code
+        FROM stock_universe u
+        LEFT JOIN (
+          SELECT code, MAX(trade_date) AS latest_trade_date
+          FROM stock_kline_daily
+          GROUP BY code
+        ) k ON k.code = u.code
+        WHERE u.enabled = 1
+          AND (k.latest_trade_date IS NULL OR k.latest_trade_date < ?)
+        ORDER BY u.code
+      `,
+        limit ? 'LIMIT ?' : '',
+      ]
+        .filter(Boolean)
+        .join(' ');
+      const values = limit ? [endDate, limit] : [endDate];
+      return db
+        .prepare(sql)
+        .all(...values)
+        .map((row) => row.code);
+    },
+
     seedStockUniverseFromLatestQuoteSnapshot() {
       const latest = db
         .prepare('SELECT MAX(trade_date) AS tradeDate FROM stock_quotes_daily_snapshot')

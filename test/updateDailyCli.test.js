@@ -6,7 +6,7 @@ import { parseUpdateDailyArgs } from '../src/cli/updateDailyArgs.js';
 test('parseUpdateDailyArgs maps command arguments to update service options', () => {
   assert.deepEqual(
     parseUpdateDailyArgs([
-      '--date=2026-06-17',
+      '--end-date=2026-06-17',
       '--db=data/custom.sqlite',
       '--symbols=600519,000001',
       '--initial-start=20200101',
@@ -33,6 +33,14 @@ test('parseUpdateDailyArgs uses daily update defaults', () => {
     quoteOptions: { concurrency: 5 },
     klineOptions: { period: 'daily', adjust: 'qfq' },
   });
+});
+
+test('parseUpdateDailyArgs keeps --date as a backward-compatible end date alias', () => {
+  assert.equal(parseUpdateDailyArgs(['--date=2026-06-18']).tradeDate, '2026-06-18');
+  assert.equal(
+    parseUpdateDailyArgs(['--date=2026-06-18', '--end-date=2026-06-19']).tradeDate,
+    '2026-06-19'
+  );
 });
 
 test('parseUpdateDailyArgs rejects invalid concurrency', () => {

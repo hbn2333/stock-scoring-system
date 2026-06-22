@@ -1,7 +1,7 @@
 export function parseRetryFailuresArgs(argv) {
   const args = parseKeyValueArgs(argv);
   return {
-    tradeDate: args.date,
+    tradeDate: args['end-date'] ?? args.date,
     dbPath: args.db ?? 'data/stock-scoring.sqlite',
     batchSize: parsePositiveInteger(args['batch-size'] ?? '10', '--batch-size'),
     limit: args.limit ? parsePositiveInteger(args.limit, '--limit') : undefined,

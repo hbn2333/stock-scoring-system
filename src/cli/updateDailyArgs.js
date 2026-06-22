@@ -6,7 +6,7 @@ export function parseUpdateDailyArgs(argv) {
   }
 
   return {
-    tradeDate: args.date,
+    tradeDate: args['end-date'] ?? args.date,
     dbPath: args.db ?? 'data/stock-scoring.sqlite',
     symbols: parseSymbols(args.symbols),
     initialStart: args['initial-start'] ?? '20200101',

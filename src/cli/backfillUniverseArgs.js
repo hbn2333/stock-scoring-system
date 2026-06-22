@@ -4,7 +4,7 @@ export function parseBackfillUniverseArgs(argv) {
   const limit = args.limit ? parsePositiveInteger(args.limit, '--limit') : undefined;
 
   return {
-    tradeDate: args.date,
+    tradeDate: args['end-date'] ?? args.date,
     dbPath: args.db ?? 'data/stock-scoring.sqlite',
     batchSize,
     limit,

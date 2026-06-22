@@ -8,6 +8,10 @@ test('backfillUniverseData batches enabled universe symbols and updates kline-on
   const progressEvents = [];
   const times = [1000, 2000, 4000];
   const repo = {
+    listUniverseSymbolsNeedingKlineBackfill: ({ endDate, limit } = {}) => {
+      assert.equal(endDate, '2026-06-17');
+      return ['000001', '600519', '300750'].slice(0, limit ?? 3);
+    },
     listEnabledUniverseSymbols: ({ limit } = {}) =>
       ['000001', '600519', '300750'].slice(0, limit ?? 3),
   };
