@@ -14,6 +14,7 @@ test('parseRetryFailuresArgs maps command arguments to retry options', () => {
       '--initial-start=20240101',
       '--adjust=hfq',
       '--kline-source=stock-sdk',
+      '--report=json',
     ]),
     {
       tradeDate: '2026-06-18',
@@ -23,6 +24,7 @@ test('parseRetryFailuresArgs maps command arguments to retry options', () => {
       maxAttempts: 5,
       initialStart: '20240101',
       klineSource: 'stock-sdk',
+      report: 'json',
       klineOptions: { period: 'daily', adjust: 'hfq' },
     }
   );
@@ -37,6 +39,7 @@ test('parseRetryFailuresArgs uses retry defaults', () => {
     maxAttempts: 5,
     initialStart: '20240101',
     klineSource: 'tencent',
+    report: 'summary',
     klineOptions: { period: 'daily', adjust: 'qfq' },
   });
 });
@@ -61,5 +64,9 @@ test('parseRetryFailuresArgs rejects invalid numeric arguments', () => {
   assert.throws(
     () => parseRetryFailuresArgs(['--kline-source=bad']),
     /--kline-source must be one of auto, stock-sdk, tencent/
+  );
+  assert.throws(
+    () => parseRetryFailuresArgs(['--report=xml']),
+    /--report must be one of summary, json/
   );
 });

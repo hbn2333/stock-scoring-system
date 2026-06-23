@@ -7,6 +7,7 @@ import {
   todayInShanghai,
 } from '../index.js';
 import { formatRetryProgress } from './progress.js';
+import { formatRetrySummary } from './report.js';
 import { parseRetryFailuresArgs } from './retryFailuresArgs.js';
 
 const args = parseRetryFailuresArgs(process.argv.slice(2));
@@ -30,8 +31,11 @@ try {
     onProgress: (event) => console.error(formatRetryProgress(event)),
   });
 
-  console.log(JSON.stringify(report, null, 2));
+  console.log(
+    args.report === 'json' ? JSON.stringify(report, null, 2) : formatRetrySummary(report)
+  );
   if (report.status === 'failed') process.exitCode = 1;
 } finally {
   db.close();
 }
+

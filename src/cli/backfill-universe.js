@@ -8,6 +8,7 @@ import {
 } from '../index.js';
 import { parseBackfillUniverseArgs } from './backfillUniverseArgs.js';
 import { formatBackfillProgress } from './progress.js';
+import { formatBackfillSummary } from './report.js';
 
 const args = parseBackfillUniverseArgs(process.argv.slice(2));
 const { StockSDK } = await import('stock-sdk');
@@ -31,8 +32,11 @@ try {
     onProgress: (event) => console.error(formatBackfillProgress(event)),
   });
 
-  console.log(JSON.stringify(report, null, 2));
+  console.log(
+    args.report === 'json' ? JSON.stringify(report, null, 2) : formatBackfillSummary(report)
+  );
   if (report.status === 'failed') process.exitCode = 1;
 } finally {
   db.close();
 }
+

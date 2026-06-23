@@ -8,6 +8,7 @@ export function parseRetryFailuresArgs(argv) {
     maxAttempts: parsePositiveInteger(args['max-attempts'] ?? '5', '--max-attempts'),
     initialStart: args['initial-start'] ?? '20240101',
     klineSource: parseKlineSource(args['kline-source'] ?? 'tencent', '--kline-source'),
+    report: parseReport(args.report ?? 'summary', '--report'),
     klineOptions: {
       period: 'daily',
       adjust: args.adjust ?? 'qfq',
@@ -36,6 +37,13 @@ function parsePositiveInteger(value, label) {
 function parseKlineSource(value, label) {
   if (!['auto', 'stock-sdk', 'tencent'].includes(value)) {
     throw new Error(`${label} must be one of auto, stock-sdk, tencent`);
+  }
+  return value;
+}
+
+function parseReport(value, label) {
+  if (!['summary', 'json'].includes(value)) {
+    throw new Error(`${label} must be one of summary, json`);
   }
   return value;
 }
