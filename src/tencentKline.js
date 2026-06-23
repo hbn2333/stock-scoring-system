@@ -1,4 +1,5 @@
 const TENCENT_FQ_KLINE_URL = 'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get';
+const TENCENT_RAW_KLINE_URL = 'https://web.ifzq.gtimg.cn/appstock/app/kline/kline';
 const DEFAULT_LIMIT = 640;
 const DEFAULT_TIMEOUT_MS = 10000;
 
@@ -12,16 +13,18 @@ export async function fetchTencentDailyKlines(symbol, options = {}) {
 
   const tencentSymbol = mapTencentSymbol(symbol);
   const url = buildTencentKlineUrl(symbol, options);
-  const response = await fetchFn(url, {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-    signal: AbortSignal.timeout(timeoutMs),
-  });
-  if (!response.ok) {
-    throw new Error(`Tencent kline HTTP ${response.status} ${response.statusText}`);
+  try {
+    const json = await fetchTencentJson(fetchFn, url, timeoutMs);
+    return parseTencentDailyKlineResponse(json, { symbol, tencentSymbol, adjust });
+  } catch (error) {
+    if (normalizeAdjust(adjust) === '') throw error;
+    const rawJson = await fetchTencentJson(
+      fetchFn,
+      buildTencentRawKlineUrl(symbol, options),
+      timeoutMs
+    );
+    return parseTencentDailyKlineResponse(rawJson, { symbol, tencentSymbol, adjust: 'raw' });
   }
-
-  const json = await response.json();
-  return parseTencentDailyKlineResponse(json, { symbol, tencentSymbol, adjust });
 }
 
 export function buildTencentKlineUrl(symbol, options = {}) {
@@ -33,6 +36,13 @@ export function buildTencentKlineUrl(symbol, options = {}) {
   return `${TENCENT_FQ_KLINE_URL}?param=${params}`;
 }
 
+export function buildTencentRawKlineUrl(symbol, options = {}) {
+  const tencentSymbol = mapTencentSymbol(symbol);
+  const startDate = toDashedDate(options.startDate);
+  const endDate = toDashedDate(options.endDate);
+  const params = `${tencentSymbol},day,${startDate},${endDate},${options.limit ?? DEFAULT_LIMIT}`;
+  return `${TENCENT_RAW_KLINE_URL}?param=${params}`;
+}
 export function mapTencentSymbol(symbol) {
   const code = String(symbol).trim();
   if (/^(5|6|9)/.test(code)) return `sh${code}`;
@@ -87,6 +97,16 @@ function normalizeAdjust(adjust) {
   return 'qfq';
 }
 
+async function fetchTencentJson(fetchFn, url, timeoutMs) {
+  const response = await fetchFn(url, {
+    headers: { 'User-Agent': 'Mozilla/5.0' },
+    signal: AbortSignal.timeout(timeoutMs),
+  });
+  if (!response.ok) {
+    throw new Error(`Tencent kline HTTP ${response.status} ${response.statusText}`);
+  }
+  return response.json();
+}
 function toNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;

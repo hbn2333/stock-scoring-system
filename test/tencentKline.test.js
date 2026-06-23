@@ -105,6 +105,57 @@ test('fetchTencentDailyKlines calls fetch and returns parsed rows', async () => 
   assert.equal(klines[0].code, '600519');
 });
 
+test('fetchTencentDailyKlines falls back to raw Tencent kline when fqkline is unavailable', async () => {
+  const calls = [];
+  const klines = await fetchTencentDailyKlines('002762', {
+    startDate: '20240101',
+    endDate: '20260618',
+    adjust: 'qfq',
+    fetchFn: async (url) => {
+      calls.push(url);
+      if (url.includes('/fqkline/get')) {
+        return {
+          ok: false,
+          status: 501,
+          statusText: 'Not Implemented',
+          text: async () => '<!DOCTYPE html>',
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        statusText: 'OK',
+        json: async () => ({
+          code: 0,
+          data: {
+            sz002762: {
+              day: [['2024-01-02', '8.970', '9.060', '9.080', '8.920', '55574.000']],
+            },
+          },
+        }),
+      };
+    },
+  });
+
+  assert.deepEqual(calls, [
+    'https://web.ifzq.gtimg.cn/appstock/app/fqkline/get?param=sz002762,day,2024-01-01,2026-06-18,640,qfq',
+    'https://web.ifzq.gtimg.cn/appstock/app/kline/kline?param=sz002762,day,2024-01-01,2026-06-18,640',
+  ]);
+  assert.deepEqual(klines, [
+    {
+      date: '2024-01-02',
+      code: '002762',
+      open: 8.97,
+      close: 9.06,
+      high: 9.08,
+      low: 8.92,
+      volume: 55574,
+      amount: null,
+      turnoverRate: null,
+      changePercent: null,
+    },
+  ]);
+});
 test('fetchTencentDailyKlines returns an empty array when Tencent has no rows for the window', async () => {
   const klines = await fetchTencentDailyKlines('430047', {
     startDate: '20260618',
