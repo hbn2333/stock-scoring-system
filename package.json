@@ -10,6 +10,7 @@
     "update:daily": "node src/cli/update-daily.js",
     "universe:seed": "node src/cli/seed-universe.js",
     "backfill:universe": "node src/cli/backfill-universe.js",
+    "backfill:status": "node src/cli/backfill-status.js",
     "retry:failures": "node src/cli/retry-failures.js",
     "start": "node src/index.js"
   },

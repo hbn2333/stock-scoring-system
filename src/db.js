@@ -146,6 +146,90 @@ export function createSqliteRepository(db) {
         .map((row) => row.code);
     },
 
+    getKlineBackfillCoverage({ endDate, sampleLimit = 10 } = {}) {
+      if (!endDate) throw new Error('endDate is required');
+      if (!Number.isInteger(sampleLimit) || sampleLimit < 1) {
+        throw new Error('sampleLimit must be a positive integer');
+      }
+
+      const counts = db
+        .prepare(
+          `
+          SELECT
+            COUNT(*) AS totalEnabledSymbols,
+            SUM(CASE WHEN k.latest_trade_date >= ? THEN 1 ELSE 0 END) AS completedSymbols,
+            SUM(CASE WHEN k.latest_trade_date IS NULL OR k.latest_trade_date < ? THEN 1 ELSE 0 END) AS incompleteSymbols,
+            SUM(CASE WHEN k.latest_trade_date IS NULL THEN 1 ELSE 0 END) AS neverFetchedSymbols,
+            SUM(CASE WHEN k.latest_trade_date IS NOT NULL AND k.latest_trade_date < ? THEN 1 ELSE 0 END) AS staleSymbols
+          FROM stock_universe u
+          LEFT JOIN (
+            SELECT code, MAX(trade_date) AS latest_trade_date
+            FROM stock_kline_daily
+            GROUP BY code
+          ) k ON k.code = u.code
+          WHERE u.enabled = 1
+        `
+        )
+        .get(endDate, endDate, endDate);
+
+      const failureCounts = db
+        .prepare(
+          `
+          SELECT
+            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pendingFailures,
+            SUM(CASE WHEN status = 'gave_up' THEN 1 ELSE 0 END) AS gaveUpFailures
+          FROM ingest_failures
+          WHERE job_type = 'kline' AND trade_date = ?
+        `
+        )
+        .get(endDate);
+
+      const incomplete = db
+        .prepare(
+          `
+          SELECT
+            u.code,
+            u.name,
+            u.market,
+            k.latest_trade_date AS latestTradeDate
+          FROM stock_universe u
+          LEFT JOIN (
+            SELECT code, MAX(trade_date) AS latest_trade_date
+            FROM stock_kline_daily
+            GROUP BY code
+          ) k ON k.code = u.code
+          WHERE u.enabled = 1
+            AND (k.latest_trade_date IS NULL OR k.latest_trade_date < ?)
+          ORDER BY u.code
+          LIMIT ?
+        `
+        )
+        .all(endDate, sampleLimit)
+        .map((row) => ({ ...row }));
+
+      const pendingFailures = listFailureSamples(db, endDate, 'pending', sampleLimit);
+      const gaveUpFailures = listFailureSamples(db, endDate, 'gave_up', sampleLimit);
+      const totalEnabledSymbols = counts.totalEnabledSymbols ?? 0;
+      const completedSymbols = counts.completedSymbols ?? 0;
+
+      return {
+        endDate,
+        totalEnabledSymbols,
+        completedSymbols,
+        incompleteSymbols: counts.incompleteSymbols ?? 0,
+        neverFetchedSymbols: counts.neverFetchedSymbols ?? 0,
+        staleSymbols: counts.staleSymbols ?? 0,
+        pendingFailures: failureCounts.pendingFailures ?? 0,
+        gaveUpFailures: failureCounts.gaveUpFailures ?? 0,
+        completionRate:
+          totalEnabledSymbols === 0 ? 0 : round(completedSymbols / totalEnabledSymbols, 4),
+        samples: {
+          incomplete,
+          pendingFailures,
+          gaveUpFailures,
+        },
+      };
+    },
     seedStockUniverseFromLatestQuoteSnapshot() {
       const latest = db
         .prepare('SELECT MAX(trade_date) AS tradeDate FROM stock_quotes_daily_snapshot')
@@ -321,6 +405,29 @@ export function createSqliteRepository(db) {
   };
 }
 
+function listFailureSamples(db, endDate, status, limit) {
+  return db
+    .prepare(
+      `
+      SELECT
+        symbol,
+        attempt_count AS attemptCount,
+        last_error AS lastError,
+        status
+      FROM ingest_failures
+      WHERE job_type = 'kline' AND trade_date = ? AND status = ?
+      ORDER BY updated_at ASC, symbol ASC
+      LIMIT ?
+    `
+    )
+    .all(endDate, status, limit)
+    .map((row) => ({ ...row }));
+}
+
+function round(value, digits) {
+  const scale = 10 ** digits;
+  return Math.round(value * scale) / scale;
+}
 function runMany(db, rows, write) {
   db.exec('BEGIN');
   try {
@@ -331,3 +438,4 @@ function runMany(db, rows, write) {
     throw error;
   }
 }
+

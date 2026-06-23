@@ -372,6 +372,80 @@ test('sqlite repository seeds stock universe from latest quote snapshot', () => 
   }
 });
 
+test('sqlite repository summarizes kline backfill coverage before end date', () => {
+  const { db, cleanup } = createTempDatabase();
+  try {
+    initializeDatabase(db);
+    const repo = createSqliteRepository(db);
+
+    repo.upsertStockUniverse([
+      { code: '000001', name: 'Ping An Bank', market: 'SZ', enabled: true },
+      { code: '000002', name: 'Vanke A', market: 'SZ', enabled: true },
+      { code: '000004', name: 'Guohua Network', market: 'SZ', enabled: true },
+      { code: '000005', name: 'Delisted Like', market: 'SZ', enabled: true },
+      { code: '600519', name: 'Kweichow Moutai', market: 'SH', enabled: false },
+    ]);
+    repo.upsertKlineDaily([
+      createKlineRow({ code: '000001', tradeDate: '2026-06-18' }),
+      createKlineRow({ code: '000002', tradeDate: '2026-06-17' }),
+      createKlineRow({ code: '000004', tradeDate: '2026-04-27' }),
+      createKlineRow({ code: '600519', tradeDate: '2026-06-18' }),
+    ]);
+    repo.recordIngestFailure({
+      jobType: 'kline',
+      symbol: '000002',
+      tradeDate: '2026-06-18',
+      errorMessage: 'timeout',
+      maxAttempts: 5,
+    });
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      repo.recordIngestFailure({
+        jobType: 'kline',
+        symbol: '000004',
+        tradeDate: '2026-06-18',
+        errorMessage: 'no rows',
+        maxAttempts: 5,
+      });
+    }
+
+    assert.deepEqual(repo.getKlineBackfillCoverage({ endDate: '2026-06-18', sampleLimit: 2 }), {
+      endDate: '2026-06-18',
+      totalEnabledSymbols: 4,
+      completedSymbols: 1,
+      incompleteSymbols: 3,
+      neverFetchedSymbols: 1,
+      staleSymbols: 2,
+      pendingFailures: 1,
+      gaveUpFailures: 1,
+      completionRate: 0.25,
+      samples: {
+        incomplete: [
+          { code: '000002', name: 'Vanke A', market: 'SZ', latestTradeDate: '2026-06-17' },
+          { code: '000004', name: 'Guohua Network', market: 'SZ', latestTradeDate: '2026-04-27' },
+        ],
+        pendingFailures: [
+          {
+            symbol: '000002',
+            attemptCount: 1,
+            lastError: 'timeout',
+            status: 'pending',
+          },
+        ],
+        gaveUpFailures: [
+          {
+            symbol: '000004',
+            attemptCount: 5,
+            lastError: 'no rows',
+            status: 'gave_up',
+          },
+        ],
+      },
+    });
+  } finally {
+    db.close();
+    cleanup();
+  }
+});
 test('sqlite repository reads latest stored daily kline date by code', () => {
   const { db, cleanup } = createTempDatabase();
   try {
@@ -413,6 +487,20 @@ test('sqlite repository reads latest stored daily kline date by code', () => {
   }
 });
 
+function createKlineRow({ code, tradeDate }) {
+  return {
+    tradeDate,
+    code,
+    open: 10,
+    high: 11,
+    low: 9,
+    close: 10,
+    volume: 100,
+    amount: 1000,
+    turnoverRate: null,
+    changePercent: null,
+  };
+}
 function createTempDatabase() {
   const dir = mkdtempSync(join(tmpdir(), 'stock-scoring-'));
   const db = openDatabase(join(dir, 'test.sqlite'));
@@ -421,3 +509,4 @@ function createTempDatabase() {
     cleanup: () => rmSync(dir, { recursive: true, force: true }),
   };
 }
+

@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { formatBackfillSummary, formatRetrySummary } from '../src/cli/report.js';
+import {
+  formatBackfillStatusSummary,
+  formatBackfillSummary,
+  formatRetrySummary,
+} from '../src/cli/report.js';
 
 test('formatBackfillSummary renders concise success output', () => {
   assert.equal(
@@ -78,6 +82,46 @@ test('formatRetrySummary renders concise retry output', () => {
       'remainingFailures: 2',
       'failure samples:',
       '- kline 000420: still failing',
+    ].join('\n')
+  );
+});
+test('formatBackfillStatusSummary renders concise coverage output', () => {
+  assert.equal(
+    formatBackfillStatusSummary({
+      endDate: '2026-06-18',
+      totalEnabledSymbols: 4,
+      completedSymbols: 1,
+      incompleteSymbols: 3,
+      neverFetchedSymbols: 1,
+      staleSymbols: 2,
+      pendingFailures: 1,
+      gaveUpFailures: 1,
+      completionRate: 0.25,
+      samples: {
+        incomplete: [
+          { code: '000002', name: 'Vanke A', market: 'SZ', latestTradeDate: '2026-06-17' },
+        ],
+        pendingFailures: [
+          { symbol: '000002', attemptCount: 1, lastError: 'timeout', status: 'pending' },
+        ],
+        gaveUpFailures: [],
+      },
+    }),
+    [
+      'Backfill status',
+      'endDate: 2026-06-18',
+      'enabledSymbols: 4',
+      'completed: 1',
+      'incomplete: 3',
+      'completionRate: 25.00%',
+      'neverFetched: 1',
+      'stale: 2',
+      'pendingFailures: 1',
+      'gaveUpFailures: 1',
+      'incomplete samples:',
+      '- 000002 Vanke A SZ latest=2026-06-17',
+      'pending failure samples:',
+      '- 000002 attempts=1: timeout',
     ].join('\n')
   );
 });

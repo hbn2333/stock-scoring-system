@@ -1,3 +1,21 @@
+export function formatBackfillStatusSummary(report) {
+  const lines = [
+    'Backfill status',
+    `endDate: ${report.endDate}`,
+    `enabledSymbols: ${report.totalEnabledSymbols ?? 0}`,
+    `completed: ${report.completedSymbols ?? 0}`,
+    `incomplete: ${report.incompleteSymbols ?? 0}`,
+    `completionRate: ${formatPercent(report.completionRate ?? 0)}`,
+    `neverFetched: ${report.neverFetchedSymbols ?? 0}`,
+    `stale: ${report.staleSymbols ?? 0}`,
+    `pendingFailures: ${report.pendingFailures ?? 0}`,
+    `gaveUpFailures: ${report.gaveUpFailures ?? 0}`,
+  ];
+  appendIncompleteSamples(lines, report.samples?.incomplete ?? []);
+  appendFailureStatusSamples(lines, 'pending failure samples:', report.samples?.pendingFailures ?? []);
+  appendFailureStatusSamples(lines, 'gave up failure samples:', report.samples?.gaveUpFailures ?? []);
+  return lines.join('\n');
+}
 const DEFAULT_FAILURE_SAMPLE_LIMIT = 10;
 
 export function formatBackfillSummary(report, { failureSampleLimit = DEFAULT_FAILURE_SAMPLE_LIMIT } = {}) {
@@ -30,6 +48,27 @@ export function formatRetrySummary(report, { failureSampleLimit = DEFAULT_FAILUR
   return lines.join('\n');
 }
 
+function appendIncompleteSamples(lines, samples) {
+  if (samples.length === 0) return;
+  lines.push('incomplete samples:');
+  for (const sample of samples) {
+    lines.push(
+      `- ${sample.code} ${sample.name} ${sample.market ?? ''} latest=${sample.latestTradeDate ?? 'never'}`.trim()
+    );
+  }
+}
+
+function appendFailureStatusSamples(lines, title, samples) {
+  if (samples.length === 0) return;
+  lines.push(title);
+  for (const sample of samples) {
+    lines.push(`- ${sample.symbol} attempts=${sample.attemptCount}: ${sample.lastError}`);
+  }
+}
+
+function formatPercent(value) {
+  return `${(value * 100).toFixed(2)}%`;
+}
 function appendFailureSamples(lines, failures = [], limit) {
   if (failures.length === 0) return;
   lines.push('failure samples:');
