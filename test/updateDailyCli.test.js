@@ -12,6 +12,7 @@ test('parseUpdateDailyArgs maps command arguments to update service options', ()
       '--initial-start=20200101',
       '--adjust=hfq',
       '--concurrency=3',
+      '--kline-source=auto',
     ]),
     {
       tradeDate: '2026-06-17',
@@ -19,6 +20,7 @@ test('parseUpdateDailyArgs maps command arguments to update service options', ()
       symbols: ['600519', '000001'],
       initialStart: '20200101',
       quoteOptions: { concurrency: 3 },
+      klineSource: 'auto',
       klineOptions: { period: 'daily', adjust: 'hfq' },
     }
   );
@@ -31,6 +33,7 @@ test('parseUpdateDailyArgs uses daily update defaults', () => {
     symbols: [],
     initialStart: '20200101',
     quoteOptions: { concurrency: 5 },
+    klineSource: 'tencent',
     klineOptions: { period: 'daily', adjust: 'qfq' },
   });
 });
@@ -47,5 +50,9 @@ test('parseUpdateDailyArgs rejects invalid concurrency', () => {
   assert.throws(
     () => parseUpdateDailyArgs(['--concurrency=abc']),
     /--concurrency must be a positive integer/
+  );
+  assert.throws(
+    () => parseUpdateDailyArgs(['--kline-source=bad']),
+    /--kline-source must be one of auto, stock-sdk, tencent/
   );
 });

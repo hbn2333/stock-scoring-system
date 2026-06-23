@@ -24,6 +24,7 @@ try {
     initialStart: args.initialStart,
     quoteOptions: args.quoteOptions,
     klineOptions: args.klineOptions,
+    klineSource: args.klineSource,
   });
 
   console.log(JSON.stringify(report, null, 2));

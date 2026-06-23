@@ -14,6 +14,7 @@ export async function backfillUniverseData({
   limit,
   initialStart = DEFAULT_INITIAL_START,
   klineOptions,
+  klineSource,
   maxAttempts = 5,
   maxConsecutiveFailedBatches = DEFAULT_MAX_CONSECUTIVE_FAILED_BATCHES,
   failureRateAbortThreshold = DEFAULT_FAILURE_RATE_ABORT_THRESHOLD,
@@ -70,6 +71,7 @@ export async function backfillUniverseData({
       symbols: batchSymbols,
       initialStart,
       klineOptions,
+      klineSource,
       includeQuotes: false,
     });
     const rowCount = sumKlineRows(result.jobs);

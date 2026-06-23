@@ -12,6 +12,7 @@ export async function retryIngestFailures({
   maxAttempts = DEFAULT_MAX_ATTEMPTS,
   initialStart = '20240101',
   klineOptions,
+  klineSource,
   onProgress,
   now = () => Date.now(),
   updateDailyDataFn = updateDailyData,
@@ -65,6 +66,7 @@ export async function retryIngestFailures({
         symbols,
         initialStart,
         klineOptions,
+        klineSource,
         includeQuotes: false,
       });
       const failedBySymbol = new Map(

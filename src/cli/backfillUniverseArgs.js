@@ -17,6 +17,7 @@ export function parseBackfillUniverseArgs(argv) {
     batchSize,
     limit,
     initialStart: args['initial-start'] ?? '20240101',
+    klineSource: parseKlineSource(args['kline-source'] ?? 'tencent', '--kline-source'),
     maxConsecutiveFailedBatches,
     failureRateAbortThreshold,
     klineOptions: {
@@ -50,4 +51,11 @@ function parseUnitInterval(value, label) {
     throw new Error(`${label} must be a number between 0 and 1`);
   }
   return parsed;
+}
+
+function parseKlineSource(value, label) {
+  if (!['auto', 'stock-sdk', 'tencent'].includes(value)) {
+    throw new Error(`${label} must be one of auto, stock-sdk, tencent`);
+  }
+  return value;
 }

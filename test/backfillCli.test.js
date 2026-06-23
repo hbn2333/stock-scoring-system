@@ -14,6 +14,7 @@ test('parseBackfillUniverseArgs maps command arguments to backfill options', () 
       '--adjust=hfq',
       '--max-consecutive-failed-batches=3',
       '--failure-rate-abort-threshold=0.9',
+      '--kline-source=auto',
     ]),
     {
       tradeDate: '2026-06-17',
@@ -21,6 +22,7 @@ test('parseBackfillUniverseArgs maps command arguments to backfill options', () 
       batchSize: 25,
       limit: 100,
       initialStart: '20240101',
+      klineSource: 'auto',
       maxConsecutiveFailedBatches: 3,
       failureRateAbortThreshold: 0.9,
       klineOptions: { period: 'daily', adjust: 'hfq' },
@@ -35,6 +37,7 @@ test('parseBackfillUniverseArgs uses safe defaults', () => {
     batchSize: 50,
     limit: undefined,
     initialStart: '20240101',
+    klineSource: 'tencent',
     maxConsecutiveFailedBatches: 2,
     failureRateAbortThreshold: 0.8,
     klineOptions: { period: 'daily', adjust: 'qfq' },
@@ -65,5 +68,9 @@ test('parseBackfillUniverseArgs rejects invalid numeric arguments', () => {
   assert.throws(
     () => parseBackfillUniverseArgs(['--failure-rate-abort-threshold=1.5']),
     /--failure-rate-abort-threshold must be a number between 0 and 1/
+  );
+  assert.throws(
+    () => parseBackfillUniverseArgs(['--kline-source=bad']),
+    /--kline-source must be one of auto, stock-sdk, tencent/
   );
 });

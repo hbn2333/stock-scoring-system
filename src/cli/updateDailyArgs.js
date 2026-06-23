@@ -13,6 +13,7 @@ export function parseUpdateDailyArgs(argv) {
     quoteOptions: {
       concurrency,
     },
+    klineSource: parseKlineSource(args['kline-source'] ?? 'tencent', '--kline-source'),
     klineOptions: {
       period: 'daily',
       adjust: args.adjust ?? 'qfq',
@@ -36,4 +37,11 @@ function parseSymbols(value) {
     .split(',')
     .map((symbol) => symbol.trim())
     .filter(Boolean);
+}
+
+function parseKlineSource(value, label) {
+  if (!['auto', 'stock-sdk', 'tencent'].includes(value)) {
+    throw new Error(`${label} must be one of auto, stock-sdk, tencent`);
+  }
+  return value;
 }

@@ -121,6 +121,7 @@ test('updateDailyData isolates per-symbol kline failures', async () => {
     tradeDate: '2026-06-17',
     symbols: ['600519', '000001'],
     initialStart: '20200101',
+    klineFallbackFn: null,
   });
 
   assert.equal(report.status, 'partial_success');
@@ -132,6 +133,158 @@ test('updateDailyData isolates per-symbol kline failures', async () => {
       message: failure.message,
     })),
     [{ type: 'kline', symbol: '000001', message: 'network down' }]
+  );
+});
+
+test('updateDailyData falls back to Tencent kline source when stock-sdk kline fails', async () => {
+  const calls = { primary: [], fallback: [] };
+  const sdk = {
+    batch: {
+      cn: async () => [],
+    },
+    kline: {
+      cn: async (symbol, options) => {
+        calls.primary.push({ symbol, options });
+        throw new Error('fetch failed');
+      },
+    },
+  };
+  const repo = createMemoryRepo({ latestByCode: { '000001': '2026-06-18' } });
+
+  const report = await updateDailyData({
+    sdk,
+    repo,
+    tradeDate: '2026-06-19',
+    symbols: ['000001'],
+    includeQuotes: false,
+    klineFallbackFn: async (symbol, options) => {
+      calls.fallback.push({ symbol, options });
+      return [
+        {
+          date: '2026-06-19',
+          code: symbol,
+          open: 11.08,
+          high: 11.1,
+          low: 10.9,
+          close: 10.96,
+          volume: 980001,
+        },
+      ];
+    },
+  });
+
+  assert.equal(report.status, 'success');
+  assert.equal(repo.klineDaily.length, 1);
+  assert.deepEqual(calls.primary, [
+    {
+      symbol: '000001',
+      options: {
+        period: 'daily',
+        adjust: 'qfq',
+        startDate: '20260619',
+        endDate: '20260619',
+      },
+    },
+  ]);
+  assert.deepEqual(calls.fallback, [
+    {
+      symbol: '000001',
+      options: {
+        period: 'daily',
+        adjust: 'qfq',
+        startDate: '20260619',
+        endDate: '20260619',
+      },
+    },
+  ]);
+  assert.deepEqual(report.failures, []);
+  assert.deepEqual(
+    report.jobs.find((job) => job.type === 'kline'),
+    {
+      type: 'kline',
+      symbol: '000001',
+      status: 'success',
+      rowCount: 1,
+      start: '20260619',
+      end: '20260619',
+      source: 'tencent',
+      fallbackFrom: 'stock-sdk',
+      primaryError: 'fetch failed',
+    }
+  );
+});
+
+test('updateDailyData can use Tencent kline source directly', async () => {
+  const calls = { primary: 0, tencent: [] };
+  const sdk = {
+    batch: {
+      cn: async () => [],
+    },
+    kline: {
+      cn: async () => {
+        calls.primary += 1;
+        throw new Error('stock-sdk should not run');
+      },
+    },
+  };
+  const repo = createMemoryRepo();
+
+  const report = await updateDailyData({
+    sdk,
+    repo,
+    tradeDate: '2026-06-18',
+    symbols: ['000001'],
+    includeQuotes: false,
+    klineSource: 'tencent',
+    klineFallbackFn: async (symbol, options) => {
+      calls.tencent.push({ symbol, options });
+      return [{ date: '2026-06-18', code: symbol, close: 10.52 }];
+    },
+  });
+
+  assert.equal(report.status, 'success');
+  assert.equal(calls.primary, 0);
+  assert.equal(calls.tencent.length, 1);
+  assert.equal(report.jobs.find((job) => job.type === 'kline').source, 'tencent');
+  assert.equal(repo.klineDaily.length, 1);
+});
+
+test('updateDailyData reports both primary and Tencent kline failures when fallback fails', async () => {
+  const sdk = {
+    batch: {
+      cn: async () => [],
+    },
+    kline: {
+      cn: async () => {
+        throw new Error('primary unavailable');
+      },
+    },
+  };
+  const repo = createMemoryRepo();
+
+  const report = await updateDailyData({
+    sdk,
+    repo,
+    tradeDate: '2026-06-19',
+    symbols: ['000001'],
+    includeQuotes: false,
+    klineFallbackFn: async () => {
+      throw new Error('fallback empty');
+    },
+  });
+
+  assert.equal(report.status, 'failed');
+  assert.equal(repo.klineDaily.length, 0);
+  assert.deepEqual(report.failures, [
+    {
+      type: 'kline',
+      symbol: '000001',
+      message: 'stock-sdk failed: primary unavailable; tencent failed: fallback empty',
+    },
+  ]);
+  assert.equal(
+    report.jobs.find((job) => job.type === 'kline').error,
+    'stock-sdk failed: primary unavailable; tencent failed: fallback empty'
   );
 });
 

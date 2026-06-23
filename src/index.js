@@ -1,6 +1,7 @@
 export * from './schema.js';
 export * from './db.js';
 export * from './ingest.js';
+export * from './tencentKline.js';
 export * from './updateDaily.js';
 export * from './backfill.js';
 export * from './retryFailures.js';

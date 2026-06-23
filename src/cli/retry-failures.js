@@ -26,6 +26,7 @@ try {
     maxAttempts: args.maxAttempts,
     initialStart: args.initialStart,
     klineOptions: args.klineOptions,
+    klineSource: args.klineSource,
     onProgress: (event) => console.error(formatRetryProgress(event)),
   });
 
